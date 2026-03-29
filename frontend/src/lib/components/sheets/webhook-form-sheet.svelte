@@ -41,13 +41,9 @@
 	let { inputs, ...form } = $derived(createForm<typeof formSchema>(formSchema, formData));
 
 	$effect(() => {
-		if (!open) {
-			selectedTargetType = 'container';
-			selectedTargetId = '';
-			targetOptions = [];
-			return;
+		if (open) {
+			loadTargetOptions(selectedTargetType);
 		}
-		loadTargetOptions(selectedTargetType);
 	});
 
 	async function loadTargetOptions(type: WebhookTargetType) {
@@ -106,6 +102,11 @@
 
 	function handleOpenChange(newOpenState: boolean) {
 		open = newOpenState;
+		if (!newOpenState) {
+			selectedTargetType = 'container';
+			selectedTargetId = '';
+			targetOptions = [];
+		}
 	}
 </script>
 
