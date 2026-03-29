@@ -52,7 +52,7 @@ func fetchWebhook(t *testing.T, db *database.DB, id string) models.Webhook {
 // --- Token generation & hashing ---
 
 func TestWebhookTokenFormat(t *testing.T) {
-	raw, hash, prefix, err := generateWebhookToken()
+	raw, hash, prefix, err := generateWebhookTokenInternal()
 	require.NoError(t, err)
 
 	assert.True(t, strings.HasPrefix(raw, webhookTokenPrefix), "token must start with %q", webhookTokenPrefix)
@@ -66,31 +66,31 @@ func TestWebhookTokenFormat(t *testing.T) {
 
 func TestHashWebhookTokenIsDeterministic(t *testing.T) {
 	raw := "arc_wh_0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
-	first := hashWebhookToken(raw)
-	second := hashWebhookToken(raw)
+	first := hashWebhookTokenInternal(raw)
+	second := hashWebhookTokenInternal(raw)
 	assert.Equal(t, first, second)
 }
 
 func TestParseWebhookPrefix_ValidToken(t *testing.T) {
 	raw := "arc_wh_0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
-	prefix, err := parseWebhookPrefix(raw)
+	prefix, err := parseWebhookPrefixInternal(raw)
 	require.NoError(t, err)
 	assert.Equal(t, "arc_wh_01020304", prefix)
 }
 
 func TestParseWebhookPrefix_MissingPrefix(t *testing.T) {
-	_, err := parseWebhookPrefix("notawebhooktoken")
+	_, err := parseWebhookPrefixInternal("notawebhooktoken")
 	assert.ErrorIs(t, err, ErrWebhookInvalid)
 }
 
 func TestParseWebhookPrefix_TooShort(t *testing.T) {
-	_, err := parseWebhookPrefix("arc_wh_0102030") // 7 chars after prefix — too short
+	_, err := parseWebhookPrefixInternal("arc_wh_0102030") // 7 chars after prefix — too short
 	assert.ErrorIs(t, err, ErrWebhookInvalid)
 }
 
 func TestParseWebhookPrefix_LeadingWhitespaceStripped(t *testing.T) {
 	raw := "  arc_wh_0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20  "
-	prefix, err := parseWebhookPrefix(raw)
+	prefix, err := parseWebhookPrefixInternal(raw)
 	require.NoError(t, err)
 	assert.Equal(t, "arc_wh_01020304", prefix)
 }
@@ -108,7 +108,7 @@ func TestCreateWebhook_TokenNotStoredInPlaintext(t *testing.T) {
 
 	stored := fetchWebhook(t, db, wh.ID)
 	assert.NotEqual(t, rawToken, stored.TokenHash, "raw token must not be stored as-is")
-	assert.Equal(t, hashWebhookToken(rawToken), stored.TokenHash, "stored hash must match SHA-256 of raw token")
+	assert.Equal(t, hashWebhookTokenInternal(rawToken), stored.TokenHash, "stored hash must match SHA-256 of raw token")
 }
 
 func TestCreateWebhook_PrefixMatchesToken(t *testing.T) {
@@ -432,7 +432,7 @@ func TestTriggerByToken_UnknownTargetType_ReturnsInvalidType(t *testing.T) {
 	svc := newTestWebhookService(db)
 
 	rawToken := "arc_wh_aabbccdd0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c"
-	hash := hashWebhookToken(rawToken)
+	hash := hashWebhookTokenInternal(rawToken)
 	hexPart := strings.TrimPrefix(rawToken, webhookTokenPrefix)
 	prefix := webhookTokenPrefix + hexPart[:webhookTokenPrefixLen]
 
@@ -455,7 +455,7 @@ func TestTriggerByToken_UnknownTargetType_ReturnsInvalidType(t *testing.T) {
 // so dispatch tests can use known target types without needing real service dependencies.
 func insertWebhookDirect(t *testing.T, ctx context.Context, db *database.DB, rawToken, targetType, targetID, envID string) *models.Webhook {
 	t.Helper()
-	hash := hashWebhookToken(rawToken)
+	hash := hashWebhookTokenInternal(rawToken)
 	hexPart := strings.TrimPrefix(rawToken, webhookTokenPrefix)
 	wh := &models.Webhook{
 		Name:          "test-hook",

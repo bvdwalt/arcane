@@ -48,9 +48,9 @@ func NewWebhookService(db *database.DB, updaterService *UpdaterService, projectS
 	}
 }
 
-// generateWebhookToken creates a new random webhook token and returns the raw token
+// generateWebhookTokenInternal creates a new random webhook token and returns the raw token
 // (to be shown to the user once), its SHA-256 hash, and the lookup prefix.
-func generateWebhookToken() (raw, hash, prefix string, err error) {
+func generateWebhookTokenInternal() (raw, hash, prefix string, err error) {
 	b := make([]byte, webhookTokenLength)
 	if _, err = rand.Read(b); err != nil {
 		return "", "", "", fmt.Errorf("failed to generate webhook token: %w", err)
@@ -63,12 +63,12 @@ func generateWebhookToken() (raw, hash, prefix string, err error) {
 	return raw, hash, prefix, nil
 }
 
-func hashWebhookToken(raw string) string {
+func hashWebhookTokenInternal(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(sum[:])
 }
 
-func parseWebhookPrefix(raw string) (string, error) {
+func parseWebhookPrefixInternal(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	hexPart, ok := strings.CutPrefix(raw, webhookTokenPrefix)
 	if !ok || len(hexPart) < webhookTokenPrefixLen {
@@ -93,7 +93,7 @@ func (s *WebhookService) CreateWebhook(ctx context.Context, name, targetType, ta
 		return nil, "", ErrWebhookMissingTarget
 	}
 
-	raw, hash, prefix, err := generateWebhookToken()
+	raw, hash, prefix, err := generateWebhookTokenInternal()
 	if err != nil {
 		return nil, "", err
 	}
@@ -233,7 +233,7 @@ func (s *WebhookService) UpdateWebhook(ctx context.Context, id, environmentID st
 // TriggerByToken looks up a webhook by its raw token and executes the configured action.
 // Returns an updater result for "updater" webhooks; nil for "project" and "gitops".
 func (s *WebhookService) TriggerByToken(ctx context.Context, rawToken string) (*updater.Result, error) {
-	prefix, err := parseWebhookPrefix(rawToken)
+	prefix, err := parseWebhookPrefixInternal(rawToken)
 	if err != nil {
 		return nil, ErrWebhookInvalid
 	}
@@ -246,7 +246,7 @@ func (s *WebhookService) TriggerByToken(ctx context.Context, rawToken string) (*
 		return nil, fmt.Errorf("failed to look up webhook: %w", err)
 	}
 
-	hash := hashWebhookToken(rawToken)
+	hash := hashWebhookTokenInternal(rawToken)
 	var wh *models.Webhook
 	for i := range candidates {
 		if candidates[i].TokenHash == hash {
